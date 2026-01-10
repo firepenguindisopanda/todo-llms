@@ -1,0 +1,41 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm mb-4">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center" href="/">
+      <i class="bi bi-check2-square me-2"></i>
+      <span>FastAPI Todo</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarContent">
+      <ul class="navbar-nav ms-auto align-items-center">
+        {% if request and request.state and request.state.user %}
+          <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="bi bi-layout-text-window-reverse me-1"></i> Dashboard</a></li>
+          {% if request.state.user.role == 'admin' %}
+            <li class="nav-item"><a class="nav-link text-warning fw-bold" href="/admin"><i class="bi bi-shield-lock me-1"></i> Admin</a></li>
+          {% endif %}
+          <li class="nav-item ms-lg-3 dropdown">
+            <a class="nav-link dropdown-toggle btn btn-outline-light btn-sm px-3 ms-2 mt-2 mt-lg-0" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle me-1"></i> {{ request.state.user.email }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userDropdown">
+              <li><h6 class="dropdown-header">User Menu</h6></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form method="post" action="/auth/logout" class="px-3 py-1">
+                  <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                  <button class="btn btn-danger btn-sm w-100 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-box-arrow-right me-2"></i> Logout
+                  </button>
+                </form>
+              </li>
+            </ul>
+          </li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="/auth/login">Login</a></li>
+          <li class="nav-item ms-lg-2"><a class="btn btn-light btn-sm px-3 fw-bold text-primary shadow-sm" href="/auth/register">Get Started</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>

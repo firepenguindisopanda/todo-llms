@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local env files
+.env
+.env.*
+
+# IDEs
+.idea/
+.vscode/
+
+# Mypy cache
+.mypy_cache/
+
+# Misc
+*.pyc
+
+# Runtime logs
+logs/
+
+node_modules/
+dist/
+.vercel
