@@ -1,10 +1,34 @@
 services:
   - type: web
+    runtime: docker
     name: fastapi-todo-api
-    runtime: python
+    repo: https://github.com/firepenguindisopanda/todo-llms
     branch: main
     plan: free
     dockerfilePath: Dockerfile
     buildCommand: ""
     startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --loop uvloop --http httptools"
     healthCheckPath: "/"
+    envVars:
+      - fromGroup: fastapi-todo-api-settings
+
+envVarGroups:
+  - name: fastapi-todo-api-settings
+    envVars:
+      - key: ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: JWT_SECRET_KEY
+        value: "<SET_IN_RENDER_DASHBOARD>"
+      - key: SESSION_SECRET_KEY
+        value: "<SET_IN_RENDER_DASHBOARD>"
+      - key: DATABASE_URL
+        value: "postgresql+asyncpg://neondb_owner:REPLACE_ME@ep-.../neondb?sslmode=require&channel_binding=require"
+
+# NOTE: If you prefer a managed database from Render, you can add a `databases:` section
+# here and reference it via `fromDatabase` in the service's envVars instead of setting
+# DATABASE_URL directly. Since you're using Neon, it's fine to keep the DATABASE_URL
+# set to your Neon connection string (marked above).
