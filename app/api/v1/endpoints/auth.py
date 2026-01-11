@@ -1,15 +1,64 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.security.jwt_handler import create_access_token
+from app.infrastructure.security.jwt_handler import create_access_token, decode_token
 from app.api.v1.schemas.user_schemas import UserCreate, UserOut
 from app.api.dependencies.database import get_db
 from app.infrastructure.database.repositories.sqlalchemy_user_repository import SQLAlchemyUserRepository
 from app.application.use_cases.user.register_user import register_user
+from app.infrastructure.cache.redis_client import get_redis
+from app.infrastructure.database.models.user_model import User as UserModel
+from sqlalchemy import select
 
 router = APIRouter()
+
+
+@router.get('/me')
+async def me(request: Request, db: AsyncSession = Depends(get_db), redis=Depends(get_redis)):
+    """Return current user data quickly by using cache. Authorization should be 'Bearer <token>'"""
+    auth = request.headers.get('authorization')
+    user_id = None
+    if auth and auth.startswith('Bearer '):
+        token = auth.split(' ', 1)[1]
+        try:
+            payload = decode_token(token)
+            user_id = int(payload.get('sub'))
+        except Exception:
+            user_id = None
+
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Not authenticated')
+
+    cache_key = f'user:{user_id}'
+    if redis:
+        try:
+            cached = redis.get(cache_key)
+            if cached:
+                import json
+
+                return json.loads(cached)
+        except Exception:
+            pass
+
+    # fall back to DB
+    result = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+
+    view = {"id": user.id, "email": user.email, "role": user.role, "preferences": user.preferences}
+
+    if redis:
+        try:
+            import json
+
+            redis.set(cache_key, json.dumps(view), ex=300)  # TTL 5 minutes
+        except Exception:
+            pass
+
+    return view
 
 
 class Token(BaseModel):

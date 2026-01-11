@@ -56,6 +56,50 @@ async def create_todo(request: Request, title: str = Form(...), description: str
     set_flash(request, "Todo created successfully.")
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
+@router.get("/account", response_class=HTMLResponse)
+async def account_get(request: Request, db: AsyncSession = Depends(get_db), user: UserModel = Depends(get_user_from_cookie), csrf: str = Depends(get_csrf_token), flash: str = Depends(get_and_pop_flash), redis=Depends(get_redis)):
+    """Show account page with current preferences."""
+    if user is None:
+        return RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    prefs = user.preferences or {}
+    return templates.TemplateResponse(request, "pages/account.html", {"request": request, "preferences": prefs})
+
+@router.post("/account")
+async def account_post(request: Request, display_mode: str = Form(None), items_per_page: int = Form(None), db: AsyncSession = Depends(get_db), user: UserModel = Depends(get_user_from_cookie), csrf_token: str = Form(None), redis=Depends(get_redis)):
+    if user is None:
+        return RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # CSRF validation
+    if not validate_csrf_token(request, csrf_token):
+        set_flash(request, "Invalid CSRF token")
+        return RedirectResponse(url="/account", status_code=status.HTTP_303_SEE_OTHER)
+
+    prefs = user.preferences or {}
+    if display_mode:
+        prefs["display_mode"] = display_mode
+    if items_per_page is not None:
+        try:
+            prefs["items_per_page"] = int(items_per_page)
+        except Exception:
+            pass
+
+    user.preferences = prefs
+    await db.flush()
+    await db.commit()
+
+    # invalidate cache
+    if redis:
+        try:
+            cache_key = f"user:{user.id}"
+            redis.delete(cache_key)
+        except Exception:
+            pass
+
+    set_flash(request, "Account updated")
+    return RedirectResponse(url="/account", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db), user: UserModel = Depends(get_user_from_cookie), csrf: str = Depends(get_csrf_token), flash: str = Depends(get_and_pop_flash)):
     """Admin-only dashboard for system overview."""

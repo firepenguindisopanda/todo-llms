@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.infrastructure.database.models import Base
@@ -21,5 +21,8 @@ class User(Base):
     role = Column(String(50), default="user", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # JSON column for user preferences (stored as JSON object)
+    preferences = Column(JSON(), nullable=True, default=dict)
 
     todos = relationship("Todo", back_populates="user", cascade="all, delete-orphan")

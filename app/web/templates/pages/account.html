@@ -1,0 +1,36 @@
+{% extends 'layouts/main.html' %}
+
+{% block title %}Account - FastAPI Todo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <h2 class="mb-3">Account Settings</h2>
+
+    {% if request.state.flash %}
+      <div class="alert alert-success">{{ request.state.flash }}</div>
+    {% endif %}
+
+    <form method="post" action="/account">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+
+      <div class="mb-3">
+        <label for="display_mode" class="form-label">Display Mode</label>
+        <select id="display_mode" name="display_mode" class="form-select">
+          <option value="light" {% if preferences.display_mode == 'light' %}selected{% endif %}>Light</option>
+          <option value="dark" {% if preferences.display_mode == 'dark' %}selected{% endif %}>Dark</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label for="items_per_page" class="form-label">Items per page</label>
+        <input id="items_per_page" name="items_per_page" type="number" min="1" class="form-control" value="{{ preferences.items_per_page or 10 }}">
+      </div>
+
+      <div class="d-grid">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
