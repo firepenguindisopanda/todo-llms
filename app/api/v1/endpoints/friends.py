@@ -30,9 +30,10 @@ async def pusher_authentication(
     if not socket_id or not channel_name:
         raise HTTPException(status_code=400, detail="Missing socket_id or channel_name")
 
-    # Security check: Ensure user is only subscribing to their own channel
-    if channel_name != f"private-user-{user.id}":
-         raise HTTPException(status_code=403, detail="Forbidden: You can only subscribe to your own channel")
+
+    # Security check: Allow subscribing to own private channel or presence-friends
+    if not (channel_name == f"private-user-{user.id}" or channel_name == "presence-friends"):
+        raise HTTPException(status_code=403, detail="Forbidden: You can only subscribe to your own channel or presence-friends")
 
     auth = pusher_service.authenticate_private_channel(channel_name, socket_id)
     return JSONResponse(content=auth)
