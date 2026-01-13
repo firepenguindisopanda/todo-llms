@@ -105,7 +105,8 @@
     // Pusher
     const pusher = new Pusher('{{ pusher_key }}', {
         cluster: '{{ pusher_cluster }}',
-        encrypted: true
+        encrypted: true,
+        authEndpoint: '/api/v1/friends/pusher/auth'
     });
 
     const channel = pusher.subscribe('private-user-' + currentUserId);

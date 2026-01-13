@@ -22,17 +22,26 @@ class ChatService:
         await self.db.commit()
         await self.db.refresh(message)
 
-        # Trigger Pusher event for real-time delivery
+        # Trigger Pusher event for real-time delivery to both sender and receiver
+        payload = {
+            "id": message.id,
+            "sender_id": sender_id,
+            "content": content,
+            "created_at": message.created_at.isoformat()
+        }
+        # To receiver
         pusher_service.trigger_event(
             f"private-user-{receiver_id}",
             "new-message",
-            {
-                "id": message.id,
-                "sender_id": sender_id,
-                "content": content,
-                "created_at": message.created_at.isoformat()
-            }
+            payload
         )
+        # To sender (for live update in other tabs/devices)
+        if sender_id != receiver_id:
+            pusher_service.trigger_event(
+                f"private-user-{sender_id}",
+                "new-message",
+                payload
+            )
         return message
 
     async def get_chat_history(self, user_id: int, friend_id: int, limit: int = 50):

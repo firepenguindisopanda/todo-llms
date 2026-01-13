@@ -2,7 +2,8 @@ from fastapi import FastAPI, HTTPException
 from app.config import settings
 
 from fastapi.middleware.cors import CORSMiddleware
-from app.logging_config import configure_logging
+
+from app.logging_config import configure_logging, logger
 
 # Try to attach SlowAPI middleware if available; it's optional for local dev/test
 try:
@@ -14,10 +15,26 @@ except Exception:
     limiter = None
     HAS_SLOWAPI = False
 
+
 # Configure logging
 configure_logging()
+from starlette.middleware.base import BaseHTTPMiddleware
+import logging
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        logger.info(f"{request.method} {request.url.path}")
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.exception(f"Error handling {request.method} {request.url.path}: {exc}")
+            raise
+        return response
+
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
+# Add logging middleware after app is defined
+app.add_middleware(RequestLoggingMiddleware)
 
 # Templates & static (for server-rendered pages)
 from fastapi.templating import Jinja2Templates

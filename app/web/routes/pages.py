@@ -208,6 +208,7 @@ async def chat_page(friend_id: int, request: Request, db: AsyncSession = Depends
 
     # Verify that the friend exists and is actually a friend
     from app.infrastructure.database.models.friendship_model import Friendship as FriendshipModel, FriendshipStatus
+    from sqlalchemy import and_, or_
     stmt = select(FriendshipModel).where(
         and_(
             FriendshipModel.status == FriendshipStatus.ACCEPTED,
