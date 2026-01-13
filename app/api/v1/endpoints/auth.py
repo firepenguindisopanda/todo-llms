@@ -233,6 +233,7 @@ async def logout_all(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    redis=Depends(get_redis),
 ):
     """Revoke all refresh tokens for the current user."""
     from app.infrastructure.database.models.refresh_token_model import RefreshToken as RefreshTokenModel
@@ -246,6 +247,14 @@ async def logout_all(
     tokens = result.scalars().all()
     for t in tokens:
         t.revoked_at = now
+        # set redis blacklist for each token
+        try:
+            if redis:
+                ttl = int((t.expires_at - now).total_seconds())
+                if ttl > 0:
+                    redis.set(f"revoked_refresh:{t.token_hash}", "1", ex=ttl)
+        except Exception:
+            pass
 
     await db.flush()
     await db.commit()

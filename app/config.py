@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -21,8 +22,18 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Stripe
-    STRIPE_API_KEY: Optional[str] = None
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
+    STRIPE_PRICE_ID: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_SUCCESS_URL: Optional[str] = None
+    STRIPE_CANCEL_URL: Optional[str] = None
+
+    # Pusher
+    PUSHER_APP_ID: Optional[str] = None
+    PUSHER_KEY: Optional[str] = None
+    PUSHER_SECRET: Optional[str] = None
+    PUSHER_CLUSTER: Optional[str] = None
 
     # Redis (Upstash)
     UPSTASH_REDIS_REST_URL: Optional[str] = None

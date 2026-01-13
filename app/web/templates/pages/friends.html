@@ -1,0 +1,263 @@
+{% extends "layouts/main.html" %}
+
+{% block title %}Friends - FastAPI Todo{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <!-- Friends List -->
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="h4 fw-bold mb-0"><i class="bi bi-people me-2 text-primary"></i>My Friends</h2>
+                        <span class="badge bg-light text-dark rounded-pill">{{ friends|length }} Friends</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush" id="friends-list">
+                        {% if friends %}
+                            {% for friend in friends %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center p-3 border-0 border-bottom" data-user-id="{{ friend.id }}">
+                                <div class="d-flex align-items-center">
+                                    <div class="position-relative me-3">
+                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                            <i class="bi bi-person fs-4 text-secondary"></i>
+                                        </div>
+                                        <span class="status-dot position-absolute bottom-0 end-0 p-1 border border-light rounded-circle {% if friend.is_online %}bg-success{% else %}bg-secondary{% endif %}" title="{% if friend.is_online %}Online{% else %}Offline{% endif %}">
+                                            <span class="visually-hidden">Status</span>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold">{{ friend.username }}</h6>
+                                        <small class="text-muted d-block mb-1 status-label">
+                                            {% if friend.is_online %}
+                                                <span class="text-success small fw-medium">Online</span>
+                                            {% else %}
+                                                Offline
+                                            {% endif %}
+                                        </small>
+                                        {% if friend.pref.show_email_to_friends %}
+                                            <div class="small text-muted"><i class="bi bi-envelope me-1"></i>{{ friend.email }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="btn-group">
+                                    <a href="/chat/{{ friend.id }}" class="btn btn-light btn-sm rounded-circle me-1" title="Message"><i class="bi bi-chat"></i></a>
+                                    <button class="btn btn-light btn-sm rounded-circle text-danger" title="Remove Friend"><i class="bi bi-person-x"></i></button>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li class="list-group-item text-center py-5 border-0">
+                                <div class="text-muted">
+                                    <i class="bi bi-person-plus display-6 mb-3 d-block"></i>
+                                    <p>You haven't added any friends yet.</p>
+                                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addFriendModal">Find Friends</button>
+                                </div>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Pending Requests & Search -->
+        <div class="col-md-4">
+            <!-- Add Friend Button -->
+            <button class="btn btn-primary w-100 fw-bold py-3 mb-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#addFriendModal">
+                <i class="bi bi-person-plus-fill me-2"></i>Add New Friend
+            </button>
+
+            <!-- Pending Requests -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="fw-bold mb-0">Pending Requests</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush" id="pending-requests">
+                        {% if pending %}
+                            {% for req in pending %}
+                            <li class="list-group-item p-3 border-0 border-bottom" id="request-{{ req.id }}">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                        <i class="bi bi-person text-secondary"></i>
+                                    </div>
+                                    <span class="small fw-bold">{{ req.user.email.split('@')[0] }}</span>
+                                </div>
+                                <div class="btn-group w-100">
+                                    <button onclick="handleRequest({{ req.id }}, 'accept')" class="btn btn-success btn-sm">Accept</button>
+                                    <button onclick="handleRequest({{ req.id }}, 'reject')" class="btn btn-outline-danger btn-sm">Reject</button>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li class="list-group-item text-center text-muted py-4 border-0">
+                                No pending requests
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Friend Modal -->
+<div class="modal fade" id="addFriendModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Add a Friend</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="add-friend-form">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">User Email or Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                            <input type="text" id="target-user" class="form-control border-start-0" placeholder="e.g. user@example.com" required>
+                        </div>
+                    </div>
+                    <div id="add-friend-status" class="alert d-none py-2 px-3 small"></div>
+                    <button type="submit" id="add-friend-btn" class="btn btn-primary w-100 fw-bold py-2 mt-2">
+                        Send Request
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pusher Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="notif-toast" class="toast border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header bg-primary text-white border-0">
+      <i class="bi bi-bell-fill me-2"></i>
+      <strong class="me-auto">Notification</strong>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toast-message">
+      <!-- Pusher data here -->
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
+<script>
+    // Initialize Pusher
+    const pusher = new Pusher('{{ pusher_key }}', {
+        cluster: '{{ pusher_cluster }}',
+        encrypted: true,
+        authEndpoint: '/api/v1/friends/pusher/auth',
+        auth: {
+            headers: {
+                // If using JWT in headers, add it here. 
+                // But since we use session/refresh cookie for web auth, 
+                // and the endpoint uses get_current_user (which might look for Bearer),
+                // we might need to be careful.
+            }
+        }
+    });
+
+    // Subscribe to private channel for notifications
+    // Note: In a real app, you'd have an auth endpoint for private channels
+    // For this demo, let's use the public channel name with user_id to simulate
+    const channel = pusher.subscribe('private-user-{{ request.state.user.id }}');
+    
+    channel.bind('friend-request-received', function(data) {
+        showToast(data.message);
+        // Dynamically update the pending list if they are on the friends page
+        location.reload(); // Quick way to update
+    });
+
+    channel.bind('friend-request-accepted', function(data) {
+        showToast(data.message);
+        location.reload();
+    });
+
+    // Handle online/offline events via a shared channel or individual notifications
+    const presenceChannel = pusher.subscribe('presence-friends');
+    presenceChannel.bind('user-offline', function(data) {
+        // Toggle the UI dot for this specific user
+        const statusDot = document.querySelector(`[data-user-id="${data.user_id}"] .status-dot`);
+        if (statusDot) {
+            statusDot.classList.remove('bg-success');
+            statusDot.classList.add('bg-secondary');
+            const statusLabel = document.querySelector(`[data-user-id="${data.user_id}"] .status-label`);
+            if (statusLabel) statusLabel.textContent = 'Offline';
+        }
+    });
+
+    presenceChannel.bind('user-online', function(data) {
+        const statusDot = document.querySelector(`[data-user-id="${data.user_id}"] .status-dot`);
+        if (statusDot) {
+            statusDot.classList.remove('bg-secondary');
+            statusDot.classList.add('bg-success');
+            const statusLabel = document.querySelector(`[data-user-id="${data.user_id}"] .status-label`);
+            if (statusLabel) statusLabel.innerHTML = '<span class="text-success small fw-medium">Online</span>';
+        }
+    });
+
+    function showToast(message) {
+        document.getElementById('toast-message').textContent = message;
+        const toastEl = document.getElementById('notif-toast');
+        const toast = new bootstrap.Toast(toastEl);
+        toast.show();
+    }
+
+    // Handle Forms
+    document.getElementById('add-friend-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const target = document.getElementById('target-user').value;
+        const btn = document.getElementById('add-friend-btn');
+        const status = document.getElementById('add-friend-status');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+
+        try {
+            const resp = await fetch('/api/v1/friends/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: target })
+            });
+            const data = await resp.json();
+            
+            status.classList.remove('d-none', 'alert-danger', 'alert-success');
+            if (resp.ok) {
+                status.classList.add('alert-success');
+                status.textContent = data.message;
+                document.getElementById('add-friend-form').reset();
+            } else {
+                status.classList.add('alert-danger');
+                status.textContent = data.detail || 'Failed to send request';
+            }
+        } catch (err) {
+            status.textContent = 'Error sending request';
+            status.classList.add('alert-danger');
+            status.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Send Request';
+        }
+    });
+
+    async function handleRequest(requestId, action) {
+        const endpoint = action === 'accept' ? `/api/v1/friends/accept/${requestId}` : `/api/v1/friends/reject/${requestId}`;
+        try {
+            const resp = await fetch(endpoint, { method: 'POST' });
+            if (resp.ok) {
+                document.getElementById(`request-${requestId}`).remove();
+                location.reload();
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+</script>
+{% endblock %}

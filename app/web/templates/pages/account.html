@@ -3,34 +3,131 @@
 {% block title %}Account - FastAPI Todo{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <h2 class="mb-3">Account Settings</h2>
+<div class="container py-4">
+  <div class="row mb-5">
+    <div class="col-md-5">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body p-4">
+          <h2 class="h4 fw-bold mb-4"><i class="bi bi-person-gear me-2 text-primary"></i>Account Settings</h2>
 
-    {% if request.state.flash %}
-      <div class="alert alert-success">{{ request.state.flash }}</div>
-    {% endif %}
+          {% if request.state.flash %}
+            <div class="alert alert-{{ request.state.flash_category if request.state.flash_category else 'success' }} alert-dismissible fade show border-0 shadow-sm" role="alert">
+              {{ request.state.flash }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endif %}
 
-    <form method="post" action="/account">
-      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+          <form method="post" action="/account">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
 
-      <div class="mb-3">
-        <label for="display_mode" class="form-label">Display Mode</label>
-        <select id="display_mode" name="display_mode" class="form-select">
-          <option value="light" {% if preferences.display_mode == 'light' %}selected{% endif %}>Light</option>
-          <option value="dark" {% if preferences.display_mode == 'dark' %}selected{% endif %}>Dark</option>
-        </select>
+            <div class="mb-4">
+              <label for="display_mode" class="form-label fw-semibold">Appearance</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-palette"></i></span>
+                <select id="display_mode" name="display_mode" class="form-select border-start-0">
+                  <option value="light" {% if preferences.display_mode == 'light' %}selected{% endif %}>Light Mode</option>
+                  <option value="dark" {% if preferences.display_mode == 'dark' %}selected{% endif %}>Dark Mode</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label for="items_per_page" class="form-label fw-semibold">Items per page</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-list-ol"></i></span>
+                <input id="items_per_page" name="items_per_page" type="number" min="1" class="form-control border-start-0" value="{{ preferences.items_per_page or 10 }}">
+              </div>
+            </div>
+
+            <hr class="my-4">
+            <h3 class="h6 fw-bold mb-3"><i class="bi bi-shield-lock me-2"></i>Privacy Settings</h3>
+            
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="show_email" name="show_email" value="true" {% if preferences.show_email_to_friends %}checked{% endif %}>
+              <label class="form-check-label" for="show_email">Show email to friends</label>
+            </div>
+
+            <div class="form-check form-switch mb-4">
+              <input class="form-check-input" type="checkbox" id="profile_public" name="profile_public" value="true" {% if preferences.is_profile_public %}checked{% endif %}>
+              <label class="form-check-label" for="profile_public">Make profile public to friends</label>
+              <div class="form-text small">Note: Username is always visible to friends.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
+              <i class="bi bi-save me-2"></i>Save Changes
+            </button>
+          </form>
+        </div>
       </div>
+    </div>
 
-      <div class="mb-3">
-        <label for="items_per_page" class="form-label">Items per page</label>
-        <input id="items_per_page" name="items_per_page" type="number" min="1" class="form-control" value="{{ preferences.items_per_page or 10 }}">
-      </div>
+    <!-- Pricing Section -->
+    <div class="col-md-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body p-4">
+          <h2 class="h4 fw-bold mb-4"><i class="bi bi-gem me-2 text-warning"></i>Subscription Plans</h2>
+          
+          <div class="row g-3">
+            <!-- Free Plan -->
+            <div class="col-md-6">
+              <div class="card h-100 border {% if request.state.user.subscription_status != 'active' %}border-primary border-2 shadow{% else %}border-light{% endif %}">
+                <div class="card-body text-center p-3">
+                  {% if request.state.user.subscription_status != 'active' %}
+                    <span class="badge bg-primary rounded-pill mb-2 px-3 py-1">Current Plan</span>
+                  {% endif %}
+                  <h3 class="h5 fw-bold mb-1">Free Plan</h3>
+                  <div class="h2 fw-bold mb-3">$0<small class="text-muted fs-6">/mo</small></div>
+                  <ul class="list-unstyled text-start small mb-4">
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Up to 10 Tasks</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Basic Organization</li>
+                    <li class="mb-2"><i class="bi bi-x-circle-fill text-danger me-2"></i>Priority Support</li>
+                  </ul>
+                  {% if request.state.user.subscription_status == 'active' %}
+                    <button class="btn btn-outline-secondary btn-sm w-100 disabled">Standard Access</button>
+                  {% else %}
+                    <button class="btn btn-secondary btn-sm w-100 disabled">Active Plan</button>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
 
-      <div class="d-grid">
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+            <!-- Pro Plan -->
+            <div class="col-md-6">
+              <div class="card h-100 border {% if request.state.user.subscription_status == 'active' %}border-success border-2 shadow{% else %}border-light{% endif %}">
+                <div class="card-body text-center p-3">
+                  {% if request.state.user.subscription_status == 'active' %}
+                    <span class="badge bg-success rounded-pill mb-2 px-3 py-1">Current Plan</span>
+                  {% endif %}
+                  <h3 class="h5 fw-bold mb-1">Pro Plan</h3>
+                  <div class="h2 fw-bold mb-3">$10<small class="text-muted fs-6">/mo</small></div>
+                  <ul class="list-unstyled text-start small mb-4">
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Unlimited Tasks</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Priority Support</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Early Access Features</li>
+                  </ul>
+                  
+                  {% if request.state.user.subscription_status == 'active' %}
+                    <button class="btn btn-success btn-sm w-100 disabled"><i class="bi bi-patch-check me-1"></i>Active</button>
+                  {% else %}
+                    <form method="post" action="/subscribe">
+                      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                      <button type="submit" class="btn btn-dark btn-sm w-100">Upgrade Now</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% if request.state.user.subscription_status != 'active' %}
+            <div class="mt-4 p-3 bg-light rounded-3 small border">
+              <i class="bi bi-info-circle-fill text-primary me-2"></i>
+              Use Stripe test card <code class="bg-white px-1 border rounded">4242 4242 4242 4242</code> for testing.
+            </div>
+          {% endif %}
+        </div>
       </div>
-    </form>
+    </div>
   </div>
 </div>
 {% endblock %}

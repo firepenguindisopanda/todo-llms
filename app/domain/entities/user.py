@@ -4,6 +4,7 @@ from typing import Optional
 
 
 @dataclass
+
 class User:
     id: int
     email: str
@@ -13,3 +14,7 @@ class User:
     role: str = "user"
     created_at: datetime = datetime.utcnow()
     updated_at: Optional[datetime] = None
+    # Stripe integration fields
+    stripe_customer_id: Optional[str] = None
+    subscription_status: str = "free"  # 'free', 'active', 'canceled'
+    subscription_plan: Optional[str] = None

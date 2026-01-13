@@ -46,6 +46,15 @@
   </footer>
 
   {% block scripts %}{% endblock %}
+
+  {# Analytics snippet only added when user has accepted cookies #}
+  {% if request.cookies.get('cookie_consent') == 'accept' %}
+  <!-- Analytics snippet (only when consent accepted) -->
+  <script>console.log('Analytics enabled: cookie consent accepted');</script>
+  {% endif %}
+
+  {% include 'components/cookie_consent.html' %}
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

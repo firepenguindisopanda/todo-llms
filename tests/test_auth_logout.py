@@ -28,6 +28,14 @@ async def test_logout_revokes_refresh_token(client):
     r4 = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
     assert r4.status_code == 401
 
+    # If Redis is configured, the revoked token should be blacklisted
+    from app.infrastructure.cache.redis_client import get_redis_client
+    import hashlib
+    redis = get_redis_client()
+    if redis:
+        h = hashlib.sha256(refresh.encode()).hexdigest()
+        assert redis.get(f"revoked_refresh:{h}") is not None
+
 
 @pytest.mark.skipif(not settings.DATABASE_URL, reason="No DATABASE_URL configured for integration tests")
 async def test_logout_cookie_and_logout_all(client, caplog):
@@ -65,6 +73,14 @@ async def test_logout_cookie_and_logout_all(client, caplog):
     r_check = await client.post("/api/v1/auth/refresh", json={"refresh_token": t1})
     assert r_check.status_code == 401
 
+    # If Redis is configured, check blacklist for t1
+    from app.infrastructure.cache.redis_client import get_redis_client
+    import hashlib
+    redis = get_redis_client()
+    if redis:
+        h1 = hashlib.sha256(t1.encode()).hexdigest()
+        assert redis.get(f"revoked_refresh:{h1}") is not None
+
     # clear caplog
     caplog.clear()
     # Now login again to get access token for logout-all
@@ -88,4 +104,10 @@ async def test_logout_cookie_and_logout_all(client, caplog):
     r_check2 = await client.post("/api/v1/auth/refresh", json={"refresh_token": t2})
     assert r_check2.status_code == 401
 
+    # If Redis is configured, check blacklist for t2
+    if redis:
+        h2 = hashlib.sha256(t2.encode()).hexdigest()
+        assert redis.get(f"revoked_refresh:{h2}") is not None
+
+    caplog.clear()
     caplog.clear()

@@ -27,23 +27,19 @@ def validate_csrf_token(request: Request, token: Optional[str]) -> bool:
         return False
     return secrets.compare_digest(session_token, token)
 
-def set_flash(request: Request, message: str) -> None:
-    """Set a one-time flash message in session."""
+def set_flash(request: Request, message: str, category: str = "success") -> None:
+    """Set a one-time flash message in session with an optional category."""
     try:
         import logging
 
-        logging.getLogger("app.web.helpers").debug("set_flash: setting _flash=%s", message)
+        logging.getLogger("app.web.helpers").debug("set_flash: setting _flash=%s category=%s", message, category)
     except Exception:
         pass
-    request.session["_flash"] = message
+    request.session["_flash"] = {"message": message, "category": category}
 
 
-def pop_flash(request: Request) -> Optional[str]:
-    """Pop and return the flash message from session, or None.
-
-    Use explicit deletion and logging so we can trace why pop may not be
-    removing the value in some test runs.
-    """
+def pop_flash(request: Request) -> Optional[dict]:
+    """Pop and return the flash message dictionary from session, or None."""
     try:
         import logging
 
@@ -53,18 +49,17 @@ def pop_flash(request: Request) -> Optional[str]:
         logger = None
 
     val = request.session.get("_flash", None)
+    
+    # Backward compatibility: if it was stored as a string, wrap it
+    if isinstance(val, str):
+        val = {"message": val, "category": "success"}
+
     if val is not None:
         try:
-            # prefer explicit deletion to avoid surprising mapping behaviour
             del request.session["_flash"]
         except Exception:
             if logger is not None:
                 logger.exception("pop_flash: failed to delete _flash")
-    try:
-        if logger is not None:
-            logger.debug("pop_flash AFTER: keys=%s", list(request.session.keys()))
-    except Exception:
-        pass
     return val
 
 
@@ -91,15 +86,27 @@ def get_and_pop_flash(request: FastAPIRequest) -> Optional[str]:
     Use as: flash = Depends(get_and_pop_flash) in GET routes that render templates.
     """
     try:
-        val = pop_flash(request)
-        try:
-            request.state.flash = val
-        except Exception:
-            pass
-        return val
+        flash_data = pop_flash(request)
+        if flash_data:
+            message = flash_data.get("message")
+            category = flash_data.get("category", "success")
+            try:
+                request.state.flash = message
+                request.state.flash_category = category
+            except Exception:
+                pass
+            return message
+        else:
+            try:
+                request.state.flash = None
+                request.state.flash_category = None
+            except Exception:
+                pass
+            return None
     except Exception:
         try:
             request.state.flash = None
+            request.state.flash_category = None
         except Exception:
             pass
         return None
@@ -151,6 +158,15 @@ async def get_user_from_cookie(request: FastAPIRequest, response: Response, db: 
     if user is None or not user.is_active:
         return None
 
+    # Update last_seen (throttle to once per minute)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    last_seen = user.last_seen
+    if last_seen is None or (now - last_seen).total_seconds() > 60:
+        user.last_seen = now
+        await db.flush()
+        await db.commit()
+
     # expose to templates via request.state for convenience
     try:
         request.state.user = user
@@ -158,3 +174,30 @@ async def get_user_from_cookie(request: FastAPIRequest, response: Response, db: 
         pass
 
     return user
+
+
+# Cookie consent helpers
+from fastapi import Response as FastAPIResponse
+
+
+def get_cookie_consent(request: FastAPIRequest) -> str | None:
+    """Return the cookie consent value ('accept' or 'decline') from cookie or session."""
+    try:
+        # prefer explicit cookie value
+        val = request.cookies.get('cookie_consent')
+        if val:
+            return val
+        # fall back to stored user preference if available
+        user = getattr(request.state, 'user', None)
+        if user is not None:
+            prefs = getattr(user, 'preferences', None) or {}
+            return prefs.get('cookie_consent')
+    except Exception:
+        return None
+
+
+def set_cookie_consent(response: FastAPIResponse, action: str) -> None:
+    """Set cookie consent cookie on the response."""
+    max_age = 365 * 24 * 60 * 60
+    response.set_cookie('cookie_consent', action, max_age=max_age, samesite='lax', secure=not getattr(__import__('app.config').config.settings, 'DEBUG', False))
+

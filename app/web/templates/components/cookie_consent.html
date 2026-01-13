@@ -1,0 +1,44 @@
+<div id="cookie-consent" class="cookie-consent p-3 bg-white border shadow rounded fixed-bottom m-3" style="max-width:680px; right:0; left:auto; z-index:1050;">
+  <div class="d-flex align-items-start">
+    <div class="flex-grow-1">
+      <strong>We use cookies</strong>
+      <p class="mb-0">We use cookies to improve your experience. You can accept or decline non-essential cookies.</p>
+    </div>
+    <div class="ms-3">
+      <button id="cookie-accept" class="btn btn-primary btn-sm me-2">Accept</button>
+      <button id="cookie-decline" class="btn btn-outline-secondary btn-sm">Decline</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    function hideBanner(){
+      var b = document.getElementById('cookie-consent');
+      if(b) b.style.display = 'none';
+    }
+
+    async function send(action){
+      try{
+        await fetch('/cookies/consent', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'action=' + encodeURIComponent(action)
+        });
+      }catch(e){
+        console.warn('cookie consent request failed', e);
+      }
+    }
+
+    var a = document.getElementById('cookie-accept');
+    var d = document.getElementById('cookie-decline');
+    if(a) a.addEventListener('click', function(e){ send('accept'); hideBanner(); window.dispatchEvent(new CustomEvent('cookie-consent-changed',{detail:{action:'accept'}})); });
+    if(d) d.addEventListener('click', function(e){ send('decline'); hideBanner(); window.dispatchEvent(new CustomEvent('cookie-consent-changed',{detail:{action:'decline'}})); });
+
+    // if cookie already set, don't show
+    try{
+      var c = document.cookie.split(';').map(s=>s.trim()).find(s=>s.indexOf('cookie_consent=')==0);
+      if(c){ hideBanner(); }
+    }catch(e){}
+  })();
+</script>

@@ -3,6 +3,16 @@
 {% block title %}Dashboard - FastAPI Todo{% endblock %}
 
 {% block content %}
+{% if user and user.subscription_status != 'active' %}
+  <div class="mb-3">
+    <form method="post" action="/subscribe">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+      <button type="submit" class="btn btn-success">
+        <i class="bi bi-credit-card me-1"></i> Subscribe for Unlimited Todos
+      </button>
+    </form>
+  </div>
+{% endif %}
 <div class="row mb-4">
   <div class="col-md-8">
     <h1 class="h2 fw-bold">Dashboard</h1>
@@ -11,8 +21,12 @@
 </div>
 
 {% if request.state.flash %}
-  <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 d-flex align-items-center" role="alert">
-    <i class="bi bi-check-circle-fill me-2"></i>
+  <div class="alert alert-{{ request.state.flash_category if request.state.flash_category else 'success' }} alert-dismissible fade show shadow-sm border-0 d-flex align-items-center" role="alert">
+    {% if request.state.flash_category == 'danger' or request.state.flash_category == 'error' %}
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    {% else %}
+      <i class="bi bi-check-circle-fill me-2"></i>
+    {% endif %}
     <div>{{ request.state.flash }}</div>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
@@ -62,30 +76,40 @@
         {% if todos and todos|length > 0 %}
           <div class="list-group list-group-flush">
             {% for t in todos %}
-              <div class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-start">
-                  <div class="me-3 mt-1">
-                    {% if t.completed %}
-                      <i class="bi bi-check-circle-fill text-success fs-4"></i>
-                    {% else %}
-                      <i class="bi bi-circle text-muted fs-4"></i>
-                    {% endif %}
-                  </div>
-                  <div>
-                    <h6 class="mb-1 fw-bold {% if t.completed %}text-decoration-line-through text-muted{% endif %}">
-                      {{ t.title }}
-                    </h6>
-                    {% if t.description %}
-                      <p class="mb-0 text-muted small">{{ t.description }}</p>
-                    {% endif %}
-                  </div>
-                </div>
-                <div class="ms-3">
+              <div class="list-group-item list-group-item-action py-3 d-flex align-items-center">
+                <!-- Left: Circle (checkbox style) -->
+                <div class="me-3 mt-1">
                   {% if t.completed %}
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Completed</span>
+                    <i class="bi bi-check-circle-fill text-success fs-4"></i>
                   {% else %}
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">In Progress</span>
+                    <form method="post" action="/todos/{{ t.id }}/complete" style="display:inline;">
+                      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                      <button type="submit" class="btn p-0 border-0 bg-transparent" title="Mark as Done" style="line-height:1;">
+                        <i class="bi bi-circle text-muted fs-4"></i>
+                      </button>
+                    </form>
                   {% endif %}
+                </div>
+                <!-- Middle: Content -->
+                <div class="flex-grow-1">
+                  <h6 class="mb-1 fw-bold {% if t.completed %}text-decoration-line-through text-muted{% endif %}">
+                    {{ t.title }}
+                  </h6>
+                  {% if t.description %}
+                    <p class="mb-0 text-muted small">{{ t.description }}</p>
+                  {% endif %}
+                  {% if t.completed %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 mt-1">Completed</span>
+                  {% endif %}
+                </div>
+                <!-- Right: Delete button -->
+                <div class="ms-3">
+                  <form method="post" action="/todos/{{ t.id }}/delete" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center" title="Delete" onclick="return confirm('Are you sure you want to delete this todo?');">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
                 </div>
               </div>
             {% endfor %}

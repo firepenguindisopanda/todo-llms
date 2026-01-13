@@ -21,6 +21,8 @@ dependencies = [
     "python-json-logger>=4.0.0",
     "itsdangerous>=2.1.2",
     "upstash-redis>=1.5.0",
+    "stripe>=14.1.0",
+    "pusher>=3.3.3",
 ]
 
 [dependency-groups]

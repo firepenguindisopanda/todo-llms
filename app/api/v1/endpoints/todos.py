@@ -101,12 +101,26 @@ async def list_todos(
 
 
 @router.post("/", status_code=201, response_model=TodoOut)
+
 async def create_todo(
     todo_in: TodoCreate,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Create a new todo for the authenticated user."""
+    """Create a new todo for the authenticated user, enforcing free/paid limits."""
+    # Count current todos for user
+    count_stmt = select(TodoModel).where(TodoModel.user_id == current_user.id)
+    count_result = await db.execute(count_stmt)
+    todo_count = len(count_result.scalars().all())
+
+    # Check subscription status (assume 'subscription_status' is available on current_user)
+    subscription_status = getattr(current_user, 'subscription_status', 'free')
+    if subscription_status != 'active' and todo_count >= 10:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Free users can only create up to 10 todos. Please subscribe to add more."
+        )
+
     todo = TodoModel(
         user_id=current_user.id,
         title=todo_in.title,

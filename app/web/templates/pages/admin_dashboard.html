@@ -17,7 +17,7 @@
 </div>
 
 {% if request.state.flash %}
-  <div class="alert alert-info alert-dismissible fade show border-0 shadow-sm" role="alert">
+  <div class="alert alert-{{ request.state.flash_category if request.state.flash_category else 'info' }} alert-dismissible fade show border-0 shadow-sm" role="alert">
     {{ request.state.flash }}
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>

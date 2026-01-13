@@ -16,7 +16,7 @@
         </div>
 
         {% if request.state.flash %}
-          <div class="alert alert-success border-0 shadow-sm small">{{ request.state.flash }}</div>
+          <div class="alert alert-{{ request.state.flash_category if request.state.flash_category else 'success' }} border-0 shadow-sm small">{{ request.state.flash }}</div>
         {% endif %}
         {% if error %}
           <div class="alert alert-danger border-0 shadow-sm small">{{ error }}</div>

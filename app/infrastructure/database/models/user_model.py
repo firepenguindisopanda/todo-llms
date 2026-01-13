@@ -22,6 +22,13 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # Stripe integration fields
+    stripe_customer_id = Column(String(255), nullable=True)
+    subscription_status = Column(String(50), default="free", nullable=False)  # 'free', 'active', 'canceled'
+
+    # Social & Presence
+    last_seen = Column(DateTime(timezone=True), nullable=True)
+
     # JSON column for user preferences (stored as JSON object)
     preferences = Column(JSON(), nullable=True, default=dict)
 

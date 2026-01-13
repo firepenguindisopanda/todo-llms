@@ -20,14 +20,23 @@ class TemplateContextMiddleware(BaseHTTPMiddleware):
             logger = logging.getLogger("app.web.middleware")
             # Only attempt to access session if it's been installed
             if "session" in request.scope:
-                flash = pop_flash(request)
-                logger.info("dispatch: popped flash=%s session_keys=%s", flash, list(request.session.keys()))
-                request.state.flash = flash
+                flash_data = pop_flash(request)
+                if flash_data:
+                    message = flash_data.get("message")
+                    category = flash_data.get("category", "success")
+                    logger.info("dispatch: popped flash=%s category=%s", message, category)
+                    request.state.flash = message
+                    request.state.flash_category = category
+                else:
+                    request.state.flash = None
+                    request.state.flash_category = None
             else:
                 logger.debug("dispatch: no session in scope, skipping pop_flash")
                 request.state.flash = None
+                request.state.flash_category = None
         except Exception:
             request.state.flash = None
+            request.state.flash_category = None
 
         response = await call_next(request)
         return response

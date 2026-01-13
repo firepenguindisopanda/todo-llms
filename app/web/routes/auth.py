@@ -41,6 +41,18 @@ async def login_post(request: Request, email: str = Form(...), password: str = F
     access_token = create_access_token(subject=str(user_model.id))
     refresh_token = await create_refresh_token(db, user_model.id)
 
+    # Update last_seen and broadcast login for presence
+    from datetime import datetime, timezone
+    user_model.last_seen = datetime.now(timezone.utc)
+    await db.flush()
+    await db.commit()
+
+    try:
+        from app.infrastructure.external_services.pusher.pusher_client import pusher_service
+        pusher_service.trigger_event("presence-friends", "user-online", {"user_id": user_model.id})
+    except Exception as e:
+        print(f"Error broadcasting user-online: {e}")
+
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     max_age = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     response.set_cookie("refresh_token", refresh_token, httponly=True, secure=not settings.DEBUG, samesite="lax", max_age=max_age)
@@ -75,15 +87,28 @@ async def register_post(request: Request, email: str = Form(...), password: str 
     return RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.post("/logout")
-async def logout(request: Request, csrf_token: str = Form(None)):
+async def logout(request: Request, csrf_token: str = Form(None), db: AsyncSession = Depends(get_db)):
     """Log out a user by clearing the refresh_token cookie."""
     # Optional: validate CSRF if you want to prevent logout CSRF
-    from app.web.helpers import validate_csrf_token
+    from app.web.helpers import validate_csrf_token, get_user_from_cookie
+    
+    # We need the user BEFORE we delete the cookie to update their status
+    from fastapi import Response
+    temp_resp = Response()
+    user = await get_user_from_cookie(request, temp_resp, db)
+
     if not validate_csrf_token(request, csrf_token):
-        # Even if CSRF fails, we can just log out for safety, or return error.
-        # But for logout, failing CSRF might just mean we stay logged in.
-        # Let's be strict for consistency.
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    if user:
+        # Mark as offline immediately
+        user.last_seen = None
+        await db.flush()
+        await db.commit()
+        
+        # Trigger Pusher event to notify friends
+        from app.infrastructure.external_services.pusher.pusher_client import pusher_service
+        pusher_service.trigger_event(f"presence-friends", "user-offline", {"user_id": user.id})
 
     response = RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie("refresh_token")

@@ -26,12 +26,16 @@ RUN pip install --upgrade pip \
         "alembic" \
         "psycopg2-binary" \
         "pydantic-settings" \
+        "pydantic[email]" \
         "python-dotenv" \
         "slowapi" \
         "structlog" \
         "email-validator" \
         "python-json-logger" \
-        "itsdangerous"
+        "itsdangerous" \
+        "upstash-redis>=1.5.0" \
+        "stripe" \
+        "pusher"
 
 # copy application
 COPY . /app

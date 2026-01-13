@@ -231,6 +231,50 @@ $env:DATABASE_URL = "postgresql+asyncpg://user:password@localhost/todo_db"
 # Or edit .env from the repo root and run tests
 ```
 
+Upstash Redis (optional)
+
+If you want to enable fast caching, session helpers, and token blacklisting using Upstash Redis, set the following environment variables:
+
+```powershell
+# Upstash REST URL and token
+$env:UPSTASH_REDIS_REST_URL = "https://<your-subdomain>.upstash.io"
+$env:UPSTASH_REDIS_REST_TOKEN = "<your-upstash-token>"
+```
+
+What we use Redis for in this project:
+
+- Caching user profile lookups for the `/api/v1/auth/me` endpoint for faster responses (TTL: 5 minutes).
+- A refresh-token blacklist (key: `revoked_refresh:<sha256(token)>`) so revoked refresh tokens are rejected quickly without hitting the DB.
+- Optionally, session counters, rate-limiting, or leaderboards in the future.
+
+Implementation notes:
+
+- The repo uses the `upstash-redis` Python package and a small wrapper in `app/infrastructure/cache/redis_client.py` that exposes `get_redis_client()` and a dependency `get_redis()` for FastAPI routes.
+- The refresh token service checks the Redis blacklist first; when revoking a refresh token we set a temporary blacklist entry with TTL equal to the token's remaining lifetime.
+- All Redis usage is optional — if no Upstash credentials are present the app will continue to use the DB-only refresh token logic.
+
+Security & Operations
+
+- Keep the Upstash token secret (store it in Render repo env vars or your chosen platform secret store).
+- Monitor Redis errors in production and set up alerts for elevated error rates.
+
+Cookie consent (privacy)
+
+This app includes a small, custom cookie consent banner for visitors. It shows a dismissible banner with **Accept** and **Decline** options. The consent is stored in a long-lived cookie named `cookie_consent` with the values `accept` or `decline` and, if the user is logged in, also saved in `User.preferences.cookie_consent`.
+
+- The `/cookies/consent` endpoint accepts `POST` with `action=accept` or `action=decline` and sets the cookie accordingly.
+- The main layout only renders non-essential scripts (e.g., analytics placeholder) when `cookie_consent=accept` is present.
+
+Manual test (quick):
+
+1. Start the app locally and visit the site (or run the `scripts/manual_redis_check.py` with `BASE_URL_REAL` pointing at your deploy).
+2. The cookie banner appears for new visitors. Click **Accept** to set the cookie; the response will include `Set-Cookie: cookie_consent=accept`.
+3. After accepting, non-essential scripts (analytics placeholder) are included — you should see an `Analytics enabled` message in the page source.
+4. If you log in and accept, the preference is persisted to your account (`User.preferences.cookie_consent`).
+
+If you'd like I can extend the banner to offer per-category choices (analytics / advertising / functional) and wire it to a small consent management UI.
+
+
 
 Writing unit tests (pytest) 
 
@@ -344,4 +388,82 @@ Notes:
 - The `behave-ci` script uses either `psycopg2` (default) or system `createdb`/`dropdb` when `BEHAVE_USE_CREATEDB=true`.
 - If your DB user lacks create/drop privileges you can instead create a dedicated test DB in CI and set `DATABASE_URL` to point to it before running `make behave-ci`.
 - The script runs migrations in the ephemeral DB before running behave so you get a realistic schema state.
+
+---
+
+## Stripe Integration Setup
+
+To enable subscriptions and unlock unlimited todos, follow these steps:
+
+1.  **Get API Keys**:
+    - Log in to your [Stripe Dashboard](https://dashboard.stripe.com/test/apikeys).
+    - Ensure **Test Mode** is toggled ON.
+    - Copy your **Secret key** (`sk_test_...`) and **Publishable key** (`pk_test_...`).
+    - Add them to your `.env` file as `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`.
+
+2.  **Create a Subscription Product**:
+    - Go to [Products](https://dashboard.stripe.com/test/products).
+    - Click **Add Product**.
+    - Set Name (e.g., "Pro Plan") and Price (e.g., $10).
+    - Select **Recurring** pricing.
+    - Copy the **Price ID** (starts with `price_...`) and add it to `.env` as `STRIPE_PRICE_ID`.
+
+3.  **Setup Webhooks for Local Development**:
+    - Install the [Stripe CLI](https://docs.stripe.com/stripe-cli).
+    - Run `stripe login` to authenticate.
+    - Run `stripe listen --forward-to localhost:8000/api/v1/stripe/webhook` to forward events to your local server.
+    - The CLI will provide a **Webhook Signing Secret** (starts with `whsec_...`). Add this to `.env` as `STRIPE_WEBHOOK_SECRET`.
+
+4.  **Production Webhook Configuration (Render)**:
+    When deploying to Render, you must add your deployed webhook URL to the Stripe Dashboard to handle live events.
+    - **Endpoint URL**: `https://todo-llms.onrender.com/api/v1/stripe/webhook`
+    - **Events to Select**:
+        - `checkout.session.completed`: Activated when a user successfully checks out.
+        - `customer.subscription.deleted`: Handled when a subscription is canceled or expires.
+        - `customer.subscription.updated`: Syncs status changes (e.g., from `active` to `past_due`).
+        - `invoice.payment_failed`: Marks the user as `past_due` if a recurring payment fails.
+    - After adding the endpoint, copy the **Signing Secret** and add it to your Render environment variables as `STRIPE_WEBHOOK_SECRET`.
+
+---
+
+## Verifying Subscriptions
+
+Once you have performed a test payment, you can verify that the subscription was successfully activated in several ways:
+
+### 1. Check Application Logs
+Monitor the terminal output where `uvicorn` is running. You should see entries like:
+- `INFO:httpx: HTTP Request: POST http://localhost:8000/api/v1/subscriptions/create-checkout-session "HTTP/1.1 200 OK"`
+- `INFO:app.api.webhooks: Webhook received: checkout.session.completed`
+
+### 2. Stripe CLI Output
+If you are running `stripe listen`, the terminal will show live events:
+- `2026-01-12 14:00:00  --> checkout.session.completed [evt_...]`
+- `2026-01-12 14:00:00  <--  [200] POST http://localhost:8000/api/v1/stripe/webhook`
+
+### 3. Database Check (SQL)
+You can query your database directly to see the status of a user:
+```sql
+SELECT email, subscription_status, stripe_customer_id FROM users WHERE email = 'your-email@example.com';
+```
+
+### 4. Database Check (Python Script)
+You can run this quick script to check the status of all users:
+```bash
+uv run python -c "
+import asyncio
+from sqlalchemy import select
+from app.infrastructure.database.connection import SessionLocal
+from app.infrastructure.database.models.user_model import User
+
+async def check():
+    async with SessionLocal() as session:
+        result = await session.execute(select(User))
+        users = result.scalars().all()
+        for u in users:
+            print(f'User: {u.email} | Status: {u.subscription_status} | Stripe ID: {u.stripe_customer_id}')
+
+asyncio.run(check())
+"
+```
+
 

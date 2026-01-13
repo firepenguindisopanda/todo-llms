@@ -1,0 +1,127 @@
+{% extends 'layouts/main.html' %}
+
+{% block title %}Admin — Cookie Consents{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <h1 class="h3 mb-3">Cookie Consents</h1>
+    <p class="text-muted">View and manage cookie consent settings for users.</p>
+
+    <div class="card p-3">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <form class="d-flex" method="get" action="/admin/cookies">
+          <input type="text" class="form-control form-control-sm me-2" name="q" placeholder="Search by email or role" value="{{ request.query_params.get('q','') }}">
+          <button class="btn btn-outline-secondary btn-sm" type="submit">Filter</button>
+        </form>
+        <div>
+          <a class="btn btn-sm btn-outline-primary" href="/admin/cookies/export{% if request.query_params.get('q') %}?q={{ request.query_params.get('q') | urlencode }}{% endif %}">Export CSV</a>
+        </div>
+      </div>
+
+      <form id="bulk-clear-form" method="post" action="/admin/cookies/bulk_clear" class="mb-3">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+        <input type="hidden" name="user_ids" id="bulk-user-ids" value="">
+        <button id="bulk-clear-btn" type="button" class="btn btn-danger btn-sm">Clear selected consents</button>
+      </form>
+
+      <!-- Confirmation modal -->
+      <div class="modal fade" id="confirmBulkModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Confirm bulk clear</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>Are you sure you want to clear cookie consent for the selected users?</p>
+              <div id="confirm-user-list" style="max-height:200px; overflow:auto; font-size:0.9rem;"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button id="confirm-bulk-submit" type="button" class="btn btn-danger">Confirm</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="user-list-form">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th><input id="select-all" type="checkbox"></th>
+            <th>ID</th>
+            <th>Email</th>
+            <th>Cookie Consent</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td><input class="select-user" type="checkbox" data-email="{{ u.email }}" value="{{ u.id }}"></td>
+            <td>{{ u.id }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ (u.preferences.cookie_consent if u.preferences and u.preferences.cookie_consent is defined) or '—' }}</td>
+            <td>
+              <form method="post" action="/admin/cookies/clear" style="display:inline">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                <button class="btn btn-sm btn-outline-danger">Clear consent</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </form>
+
+      <script>
+        (function(){
+          var selectAll = document.getElementById('select-all');
+          if(selectAll){
+            selectAll.addEventListener('change', function(){
+              var checked = selectAll.checked;
+              document.querySelectorAll('.select-user').forEach(function(cb){ cb.checked = checked });
+            });
+          }
+
+          document.getElementById('bulk-clear-btn').addEventListener('click', function(){
+            var selected = Array.from(document.querySelectorAll('.select-user:checked'));
+            if(selected.length === 0){
+              alert('No users selected');
+              return;
+            }
+            // populate modal list
+            var list = document.getElementById('confirm-user-list');
+            list.innerHTML = '';
+            selected.forEach(function(cb){
+              var email = cb.getAttribute('data-email');
+              var li = document.createElement('div');
+              li.textContent = email + ' (id=' + cb.value + ')';
+              list.appendChild(li);
+            });
+            // set hidden input
+            var ids = selected.map(function(cb){ return cb.value }).join(',');
+            document.getElementById('bulk-user-ids').value = ids;
+            // show modal
+            var modal = new bootstrap.Modal(document.getElementById('confirmBulkModal'));
+            modal.show();
+          });
+
+          document.getElementById('confirm-bulk-submit').addEventListener('click', function(){
+            // submit form
+            var form = document.getElementById('bulk-clear-form');
+            // convert comma list into repeated inputs
+            var ids = document.getElementById('bulk-user-ids').value.split(',').filter(Boolean);
+            ids.forEach(function(id){
+              var inp = document.createElement('input'); inp.type='hidden'; inp.name='user_ids'; inp.value=id; form.appendChild(inp);
+            });
+            form.submit();
+          });
+        })();
+      </script>
+    </div>
+  </div>
+</div>
+{% endblock %}

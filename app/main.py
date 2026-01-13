@@ -68,8 +68,10 @@ app.include_router(api_v1_router, prefix="/api/v1")
 # include web (HTML) routes
 from app.web.routes.pages import router as pages_router
 from app.web.routes.auth import router as web_auth_router
+from app.web.routes.cookies import router as cookies_router
 app.include_router(pages_router)
 app.include_router(web_auth_router)
+app.include_router(cookies_router)
 
 @app.delete("/todos/{todo_id}", status_code=204)
 def delete_todo(todo_id: int):

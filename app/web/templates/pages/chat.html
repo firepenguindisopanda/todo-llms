@@ -1,0 +1,169 @@
+{% extends "layouts/main.html" %}
+
+{% block title %}Chat with {{ friend.email.split('@')[0] }} - FastAPI Todo{% endblock %}
+
+{% block head %}
+<style>
+    .chat-container {
+        height: 60vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+        background: #fdfdfd;
+        border-radius: 0.5rem;
+    }
+    .message {
+        max-width: 75%;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        position: relative;
+    }
+    .message-sent {
+        align-self: flex-end;
+        background-color: #0d6efd;
+        color: white;
+        border-bottom-right-radius: 0.25rem;
+    }
+    .message-received {
+        align-self: flex-start;
+        background-color: #e9ecef;
+        color: #212529;
+        border-bottom-left-radius: 0.25rem;
+    }
+    .message-time {
+        font-size: 0.7rem;
+        opacity: 0.8;
+        display: block;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0 py-3 d-flex align-items-center">
+                    <a href="/friends" class="btn btn-light btn-sm rounded-circle me-3"><i class="bi bi-arrow-left"></i></a>
+                    <div class="d-flex align-items-center">
+                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                            <i class="bi bi-person text-secondary fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold">{{ friend.email.split('@')[0] }}</h6>
+                            <small class="text-muted">Chatting now</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-container border-top border-bottom" id="chat-window">
+                    {% for msg in messages %}
+                        <div class="message {% if msg.sender_id == request.state.user.id %}message-sent{% else %}message-received{% endif %}">
+                            <div class="message-content">{{ msg.content }}</div>
+                            <span class="message-time text-end">
+                                {{ msg.created_at.strftime('%H:%M') }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                    {% if not messages %}
+                        <div class="text-center text-muted py-5" id="no-messages">
+                            <i class="bi bi-chat-dots display-6 d-block mb-3"></i>
+                            <p>No messages yet. Say hi!</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="card-footer bg-white border-0 p-3">
+                    <form id="chat-form" class="d-flex gap-2">
+                        <input type="text" id="message-input" class="form-control border-0 bg-light py-2" placeholder="Type your message..." required autocomplete="off">
+                        <button type="submit" class="btn btn-primary px-3 rounded-pill shadow-sm">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
+<script>
+    const chatWindow = document.getElementById('chat-window');
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const friendId = {{ friend.id }};
+    const currentUserId = {{ request.state.user.id }};
+
+    // Scroll to bottom
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    // Pusher
+    const pusher = new Pusher('{{ pusher_key }}', {
+        cluster: '{{ pusher_cluster }}',
+        encrypted: true
+    });
+
+    const channel = pusher.subscribe('private-user-' + currentUserId);
+    
+    channel.bind('new-message', function(data) {
+        if (data.sender_id === friendId) {
+            appendMessage(data.content, 'received', data.created_at);
+        }
+    });
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const content = messageInput.value.trim();
+        if (!content) return;
+
+        messageInput.value = '';
+        
+        // Optimistically show message
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        appendMessage(content, 'sent', now);
+
+        try {
+            await fetch('/api/v1/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    receiver_id: friendId,
+                    content: content 
+                })
+            });
+        } catch (err) {
+            console.error('Failed to send message:', err);
+        }
+    });
+
+    function appendMessage(content, type, time) {
+        const noMessages = document.getElementById('no-messages');
+        if (noMessages) noMessages.remove();
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message message-${type}`;
+        
+        // Basic escaping
+        const safeContent = document.createTextNode(content);
+        
+        let formattedTime = time;
+        if (time.includes('T')) { // parse ISO
+             formattedTime = new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        msgDiv.innerHTML = `
+            <div class="message-content"></div>
+            <span class="message-time text-end">${formattedTime}</span>
+        `;
+        msgDiv.querySelector('.message-content').appendChild(safeContent);
+        
+        chatWindow.appendChild(msgDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+</script>
+{% endblock %}

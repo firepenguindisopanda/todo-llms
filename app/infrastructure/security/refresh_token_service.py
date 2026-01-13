@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.models.refresh_token_model import RefreshToken as RefreshTokenModel
 from app.config import settings
+from app.infrastructure.cache.redis_client import get_redis_client
 
 
 def _utcnow() -> datetime:
@@ -28,6 +29,16 @@ async def create_refresh_token(session: AsyncSession, user_id: int) -> str:
 
 async def verify_and_rotate_refresh_token(session: AsyncSession, token: str):
     token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    # Fast-path: check Redis blacklist first
+    redis = get_redis_client()
+    if redis:
+        try:
+            if redis.get(f"revoked_refresh:{token_hash}"):
+                return None
+        except Exception:
+            pass
+
     result = await session.execute(select(RefreshTokenModel).where(RefreshTokenModel.token_hash == token_hash))
     rt = result.scalar_one_or_none()
     if rt is None:
@@ -39,6 +50,15 @@ async def verify_and_rotate_refresh_token(session: AsyncSession, token: str):
     # Revoke old token
     rt.revoked_at = now
     await session.flush()
+
+    # Also insert into Redis blacklist with TTL equal to remaining lifetime
+    try:
+        if redis:
+            ttl = int((rt.expires_at - now).total_seconds())
+            if ttl > 0:
+                redis.set(f"revoked_refresh:{token_hash}", "1", ex=ttl)
+    except Exception:
+        pass
 
     # Create new token
     new_token = secrets.token_urlsafe(32)
@@ -59,6 +79,18 @@ async def revoke_refresh_token(session: AsyncSession, token: str) -> bool:
     rt = result.scalar_one_or_none()
     if rt is None:
         return False
-    rt.revoked_at = _utcnow()
+    now = _utcnow()
+    rt.revoked_at = now
     await session.commit()
+
+    # Add to Redis blacklist for remaining TTL
+    try:
+        redis = get_redis_client()
+        if redis:
+            ttl = int((rt.expires_at - now).total_seconds())
+            if ttl > 0:
+                redis.set(f"revoked_refresh:{token_hash}", "1", ex=ttl)
+    except Exception:
+        pass
+
     return True

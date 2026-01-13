@@ -7,7 +7,7 @@ services:
     plan: free
     dockerfilePath: Dockerfile
     buildCommand: ""
-    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --loop uvloop --http httptools"
+    startCommand: "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --loop uvloop --http httptools"
     healthCheckPath: "/"
     envVars:
       - fromGroup: fastapi-todo-api-settings
@@ -22,11 +22,37 @@ envVarGroups:
       - key: DEBUG
         value: "false"
       - key: JWT_SECRET_KEY
-        value: "<SET_IN_RENDER_DASHBOARD>"
+        value: "<GENERATE_AND_SET_IN_RENDER>"
       - key: SESSION_SECRET_KEY
-        value: "<SET_IN_RENDER_DASHBOARD>"
+        value: "<GENERATE_AND_SET_IN_RENDER>"
       - key: DATABASE_URL
         value: "postgresql+asyncpg://neondb_owner:REPLACE_ME@ep-.../neondb?sslmode=require&channel_binding=require"
+      
+      # Social & Real-time (Pusher)
+      - key: PUSHER_APP_ID
+        value: "<SET_IN_RENDER>"
+      - key: PUSHER_KEY
+        value: "<SET_IN_RENDER>"
+      - key: PUSHER_SECRET
+        value: "<SET_IN_RENDER>"
+      - key: PUSHER_CLUSTER
+        value: "<SET_IN_RENDER>"
+
+      # Payments (Stripe)
+      - key: STRIPE_SECRET_KEY
+        value: "<SET_IN_RENDER>"
+      - key: STRIPE_PUBLISHABLE_KEY
+        value: "<SET_IN_RENDER>"
+      - key: STRIPE_PRICE_ID
+        value: "<SET_IN_RENDER>"
+      - key: STRIPE_WEBHOOK_SECRET
+        value: "<SET_IN_RENDER>"
+
+      # Cache (Optional Upstash Redis)
+      - key: UPSTASH_REDIS_REST_URL
+        value: "<SET_IN_RENDER>"
+      - key: UPSTASH_REDIS_REST_TOKEN
+        value: "<SET_IN_RENDER>"
 
 # NOTE: If you prefer a managed database from Render, you can add a `databases:` section
 # here and reference it via `fromDatabase` in the service's envVars instead of setting

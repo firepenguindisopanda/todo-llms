@@ -49,8 +49,29 @@ def run_migrations_online():
     if url and "+asyncpg" in url:
         from sqlalchemy.ext.asyncio import create_async_engine
         import asyncio
+        from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
-        connectable = create_async_engine(url, poolclass=pool.NullPool, future=True)
+        # Parse URL and remove query params that asyncpg.connect does not accept
+        parsed = urlparse(url)
+        qs = dict(parse_qsl(parsed.query))
+
+        connect_args = {}
+        ssl_required = False
+        if "sslmode" in qs:
+            if qs.get("sslmode") in ("require", "verify-ca", "verify-full"):
+                ssl_required = True
+            qs.pop("sslmode", None)
+
+        # drop unsupported channel_binding param
+        qs.pop("channel_binding", None)
+
+        new_query = urlencode(qs) if qs else ""
+        cleaned_url = urlunparse(parsed._replace(query=new_query))
+
+        if ssl_required:
+            connect_args["ssl"] = True
+
+        connectable = create_async_engine(cleaned_url, poolclass=pool.NullPool, future=True, connect_args=connect_args)
 
         async def run_async_migrations():
             async with connectable.connect() as connection:

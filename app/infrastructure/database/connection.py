@@ -33,7 +33,8 @@ if DATABASE_URL:
     if ssl_required:
         connect_args["ssl"] = True
 
-    engine = create_async_engine(cleaned_url, echo=settings.DEBUG, future=True, connect_args=connect_args if connect_args else None)
+    # Ensure connect_args is always a dict (SQLAlchemy expects an iterable mapping)
+    engine = create_async_engine(cleaned_url, echo=settings.DEBUG, future=True, connect_args=connect_args)
     AsyncSessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
