@@ -35,7 +35,9 @@ RUN pip install --upgrade pip \
         "itsdangerous" \
         "upstash-redis>=1.5.0" \
         "stripe" \
-        "pusher"
+        "pusher" \
+        "langchain-nvidia-ai-endpoints" \
+        "langchain-core"
 
 # copy application
 COPY . /app
