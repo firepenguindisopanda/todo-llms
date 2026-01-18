@@ -37,6 +37,12 @@ def set_flash(request: Request, message: str, category: str = "success") -> None
         pass
     request.session["_flash"] = {"message": message, "category": category}
 
+# Jinja2 filter: convert newlines to <br> tags for HTML display
+def nl2br(value: str) -> str:
+    if not value:
+        return ''
+    return value.replace('\n', '<br>\n')
+
 
 def pop_flash(request: Request) -> Optional[dict]:
     """Pop and return the flash message dictionary from session, or None."""

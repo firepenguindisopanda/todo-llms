@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -39,6 +38,23 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_REST_URL: Optional[str] = None
     UPSTASH_REDIS_REST_TOKEN: Optional[str] = None
     REDIS_URL: Optional[str] = None
+
+    # NVIDIA NIM LLM Configuration
+    NVIDIA_API_KEY: Optional[str] = None
+    NVIDIA_MODEL_NAME: str = "meta/llama3-70b-instruct"
+    NVIDIA_MAX_COMPLETION_TOKENS: int = 1024  # Use this for future compatibility
+    NVIDIA_MAX_TOKENS: int = 1024  # Deprecated, use NVIDIA_MAX_COMPLETION_TOKENS
+    NVIDIA_TEMPERATURE: float = 0.3
+    NVIDIA_TIMEOUT: int = 60
+
+    # Rate Limiting for LLM
+    LLM_RATE_LIMIT_HOURLY: int = 10
+    LLM_RATE_LIMIT_DAILY: int = 50
+    LLM_RATE_LIMIT_MONTHLY: int = 500
+
+    # Steps Generation
+    STEPS_GENERATION_ENABLED: bool = True
+    STEPS_MAX_STEPS_PER_TODO: int = 10
 
     # Logging
     LOG_DIR: Path = Path("logs")

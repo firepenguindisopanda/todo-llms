@@ -43,7 +43,11 @@ from starlette.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from datetime import datetime
 
+# Templates setup
 templates = Jinja2Templates(directory="app/web/templates")
+# Register custom Jinja2 filters
+from app.web.helpers import nl2br
+templates.env.filters["nl2br"] = nl2br
 # Provide a safe STATIC_URL global to templates so templates can use it
 templates.env.globals["STATIC_URL"] = "/static/"
 # Session middleware for flash messages and CSRF token storage

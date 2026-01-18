@@ -1,0 +1,275 @@
+{% extends 'layouts/main.html' %}
+
+{% block title %}{{ todo.title }} - Todo Details{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ todo.title }}</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+{% if request.state.flash %}
+  <div class="alert alert-{{ request.state.flash_category if request.state.flash_category else 'success' }} alert-dismissible fade show shadow-sm border-0 d-flex align-items-center" role="alert">
+    {% if request.state.flash_category == 'danger' or request.state.flash_category == 'error' %}
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    {% else %}
+      <i class="bi bi-check-circle-fill me-2"></i>
+    {% endif %}
+    <div>{{ request.state.flash }}</div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- Todo Details -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="card-title mb-1 fw-bold">{{ todo.title }}</h4>
+          <p class="text-muted mb-0 small">Created {{ todo.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+        </div>
+        <div class="d-flex gap-2">
+          {% if todo.completed %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
+              <i class="bi bi-check-circle-fill me-1"></i> Completed
+            </span>
+          {% else %}
+            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2">
+              <i class="bi bi-clock me-1"></i> Pending
+            </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        {% if todo.description %}
+          <div class="mb-4">
+            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-file-text me-1"></i> Description</h6>
+            <div class="bg-light rounded p-3">
+              {{ todo.description | nl2br }}
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- AI-Generated Steps -->
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-muted mb-0">
+              <i class="bi bi-list-check me-1"></i> AI-Generated Steps
+            </h6>
+            {% if steps_data and steps_data.steps %}
+              <form method="post" action="/todos/{{ todo.id }}/regenerate-steps" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                <button type="submit" class="btn btn-outline-primary btn-sm" title="Regenerate Steps">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Regenerate
+                </button>
+              </form>
+            {% endif %}
+          </div>
+
+          {% if steps_data and steps_data.steps %}
+            <div class="bg-light rounded p-3">
+              {% for step in steps_data.steps %}
+                <div class="step-item mb-3 d-flex">
+                  <div class="step-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">
+                    {{ step.step_number }}
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1 fw-semibold">{{ step.title }}</h6>
+                    <p class="text-muted mb-2 small">{{ step.description }}</p>
+                    {% if step.estimated_time %}
+                      <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1 small">
+                        <i class="bi bi-clock me-1"></i> {{ step.estimated_time }}
+                      </span>
+                    {% endif %}
+                    {% if step.priority %}
+                      <span class="badge bg-{{ 'danger' if step.priority == 'high' else 'warning' if step.priority == 'medium' else 'secondary' }}-subtle text-{{ 'danger' if step.priority == 'high' else 'warning' if step.priority == 'medium' else 'secondary' }} border border-{{ 'danger' if step.priority == 'high' else 'warning' if step.priority == 'medium' else 'secondary' }}-subtle px-2 py-1 ms-2 small">
+                        {{ step.priority | capitalize }}
+                      </span>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+
+              {% if steps_data.total_estimated_time %}
+                <div class="mt-4 pt-3 border-top border-secondary-subtle">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small fw-semibold">Total Estimated Time:</span>
+                    <span class="badge bg-primary px-3 py-2">{{ steps_data.total_estimated_time }}</span>
+                  </div>
+                  {% if steps_data.complexity %}
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                      <span class="text-muted small fw-semibold">Complexity:</span>
+                      <span class="badge bg-{{ 'danger' if steps_data.complexity == 'complex' else 'warning' if steps_data.complexity == 'medium' else 'success' }}-subtle text-{{ 'danger' if steps_data.complexity == 'complex' else 'warning' if steps_data.complexity == 'medium' else 'success' }} border border-{{ 'danger' if steps_data.complexity == 'complex' else 'warning' if steps_data.complexity == 'medium' else 'success' }}-subtle px-3 py-2">
+                        {{ steps_data.complexity | capitalize }}
+                      </span>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% else %}
+            {% if todo.steps_generation_status == 'generating' %}
+              <div id="steps-loading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Generating steps...</span>
+                </div>
+                <p class="mt-3 text-muted">AI is generating steps for this todo...</p>
+                <p class="small text-muted">This may take a few seconds. You can check back in a moment.</p>
+                <div class="alert alert-info mt-4" role="alert" style="max-width: 400px; margin: 0 auto;">
+                  <i class="bi bi-hourglass-split me-2"></i>
+                  Please wait about <strong>15 seconds</strong> before hitting refresh. Steps are being generated.
+                </div>
+                <form method="get" action="">
+                  <button type="submit" class="btn btn-outline-primary mt-3">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                  </button>
+                </form>
+              </div>
+            {% elif todo.steps_generation_status == 'failed' %}
+              <div class="text-center py-5">
+                <i class="bi bi-exclamation-triangle text-danger display-4"></i>
+                <p class="mt-3 text-muted">Failed to generate steps for this todo.</p>
+                <form method="post" action="/todos/{{ todo.id }}/regenerate-steps" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Try Again
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <div class="text-center py-5">
+                <i class="bi bi-magic text-muted display-4"></i>
+                <p class="mt-3 text-muted">No AI-generated steps available yet.</p>
+                <form method="post" action="/todos/{{ todo.id }}/regenerate-steps" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-magic me-1"></i> Generate Steps
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="col-lg-4">
+    <!-- Todo Metadata -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-white py-3">
+        <h6 class="card-title mb-0 fw-bold">
+          <i class="bi bi-info-circle me-1"></i> Todo Details
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="d-flex justify-content-between">
+              <span class="text-muted small">Status</span>
+              {% if todo.completed %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Completed</span>
+              {% else %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if todo.priority %}
+            <div class="col-12">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted small">Priority</span>
+                <span class="badge bg-{{ 'danger' if todo.priority == 3 else 'warning' if todo.priority == 2 else 'secondary' }}-subtle text-{{ 'danger' if todo.priority == 3 else 'warning' if todo.priority == 2 else 'secondary' }} border border-{{ 'danger' if todo.priority == 3 else 'warning' if todo.priority == 2 else 'secondary' }}-subtle">
+                  {{ 'High' if todo.priority == 3 else 'Medium' if todo.priority == 2 else 'Low' }}
+                </span>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if todo.due_date %}
+            <div class="col-12">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted small">Due Date</span>
+                <span class="small fw-semibold">{{ todo.due_date.strftime('%B %d, %Y') }}</span>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if todo.steps_generated_at %}
+            <div class="col-12">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted small">Steps Generated</span>
+                <span class="small fw-semibold">{{ todo.steps_generated_at.strftime('%b %d, %H:%M') }}</span>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Rate Limit Info -->
+    {% if rate_stats %}
+      <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+          <h6 class="card-title mb-0 fw-bold">
+            <i class="bi bi-speedometer2 me-1"></i> AI Usage Limits
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {% for period, stats in rate_stats.items() %}
+              <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="text-muted small">{{ period | capitalize }}</span>
+                  <div class="text-end">
+                    <div class="small fw-semibold">{{ stats.current }}/{{ stats.limit }}</div>
+                    <div class="progress mt-1" style="height: 4px;">
+                      <div class="progress-bar {{ 'bg-danger' if stats.remaining == 0 else 'bg-success' if stats.remaining > stats.limit * 0.5 else 'bg-warning' }}"
+                           role="progressbar"
+                           style="width: {{ (stats.current / stats.limit * 100) if stats.limit > 0 else 0 }}%"
+                           aria-valuenow="{{ stats.current }}"
+                           aria-valuemin="0"
+                           aria-valuemax="{{ stats.limit }}"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="mt-3 pt-3 border-top border-secondary-subtle">
+            <p class="small text-muted mb-0">
+              AI step generation is limited to ensure fair usage across all users.
+            </p>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.step-item {
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 0.75rem;
+}
+
+.step-item:last-child {
+  margin-bottom: 0;
+}
+
+.step-number {
+  flex-shrink: 0;
+}
+</style>
+{% endblock %}
